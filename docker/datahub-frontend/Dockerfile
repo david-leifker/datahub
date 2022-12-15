@@ -1,7 +1,7 @@
 # Defining environment
 ARG APP_ENV=prod
 
-FROM --platform=$BUILDPLATFORM alpine:3 AS base
+FROM alpine:3 AS base
 
 RUN addgroup -S datahub && adduser -S datahub -G datahub
 
@@ -10,7 +10,7 @@ RUN apk --no-cache --update-cache --available upgrade \
     && apk --no-cache add curl \
     && apk --no-cache add openjdk11-jre --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
-FROM --platform=$BUILDPLATFORM node:16.13.0-alpine3.14 AS prod-build
+FROM node:16.13.0-alpine3.14 AS prod-build
 
 # Upgrade Alpine and base packages
 RUN apk --no-cache --update-cache --available upgrade \
