@@ -74,7 +74,8 @@ public class SearchQueryBuilder {
       escapedBuilder.analyzer(KEYWORD_LOWERCASE_ANALYZER);
     }
 
-    for (SearchableFieldSpec fieldSpec : entitySpec.getSearchableFieldSpecs()) {
+    List<SearchableFieldSpec> searchableFieldSpecs = entitySpec.getSearchableFieldSpecs();
+    for (SearchableFieldSpec fieldSpec : searchableFieldSpecs) {
       if (!fieldSpec.getSearchableAnnotation().isQueryByDefault()) {
         continue;
       }

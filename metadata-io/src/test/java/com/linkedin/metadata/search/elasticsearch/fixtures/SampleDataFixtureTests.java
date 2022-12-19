@@ -1,11 +1,14 @@
 package com.linkedin.metadata.search.elasticsearch.fixtures;
 
+import com.linkedin.common.urn.Urn;
 import com.linkedin.datahub.graphql.generated.AutoCompleteResults;
 import com.linkedin.datahub.graphql.types.chart.ChartType;
 import com.linkedin.entity.client.EntityClient;
 import com.linkedin.metadata.ESSampleDataFixture;
+import com.linkedin.metadata.search.SearchEntity;
 import com.linkedin.metadata.search.SearchResult;
 import com.linkedin.metadata.search.SearchService;
+import java.util.HashMap;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.AnalyzeRequest;
@@ -55,7 +58,7 @@ public class SampleDataFixtureTests extends AbstractTestNGSpringContextTests {
 
         // TODO: Add tags fields to query
         Map<String, Integer> expectedTypes = Map.of(
-                "dataset", 6, // expected 9 but tags/terms are missing in query fields
+                "dataset", 8,
                 "chart", 0,
                 "container", 0,
                 "dashboard", 0,
@@ -63,9 +66,14 @@ public class SampleDataFixtureTests extends AbstractTestNGSpringContextTests {
                 "mlmodel", 0
         );
 
+        Map<String, List<Urn>> actualTypes = new HashMap<>();
+        for(String key : expectedTypes.keySet()) {
+            actualTypes.put(key, result.getEntities().stream()
+                .map(SearchEntity::getEntity).filter(entity -> key.equals(entity.getEntityType())).collect(Collectors.toList()));
+        }
+
         expectedTypes.forEach((key, value) ->
-                assertEquals(result.getEntities().stream()
-                                .filter(e -> key.equals(e.getEntity().getEntityType())).count(), value.intValue(),
+                assertEquals(actualTypes.get(key).size(), value.intValue(),
                         String.format("Expected entity `%s` matches for %s. Found %s", value, key,
                                 result.getEntities().stream()
                                         .filter(e -> e.getEntity().getEntityType().equals(key))
