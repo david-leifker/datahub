@@ -13,12 +13,12 @@ import java.util.List;
 public class IndexUtils {
   private IndexUtils() { }
 
-  private static List<String> INDEX_NAMES = new ArrayList<>();
+  private static List<String> _indexNames = new ArrayList<>();
 
   public static List<String> getAllIndexNames(BaseElasticSearchComponentsFactory.BaseElasticSearchComponents esComponents,
       EntityRegistry entityRegistry) {
     // Avoid locking & reprocessing
-    List<String> indexNames = new ArrayList<>(INDEX_NAMES);
+    List<String> indexNames = new ArrayList<>(_indexNames);
     if (indexNames.isEmpty()) {
       IndexConvention indexConvention = esComponents.getIndexConvention();
       indexNames.add(indexConvention.getIndexName(ElasticSearchGraphService.INDEX_NAME));
@@ -31,7 +31,7 @@ public class IndexUtils {
                 indexNames.add(indexConvention.getTimeseriesAspectIndexName(entitySpec.getName(), aspectSpec.getName())));
       });
       indexNames.add(indexConvention.getIndexName(ElasticSearchSystemMetadataService.INDEX_NAME));
-      INDEX_NAMES = new ArrayList<>(indexNames);
+      _indexNames = new ArrayList<>(indexNames);
     }
 
     return indexNames;
