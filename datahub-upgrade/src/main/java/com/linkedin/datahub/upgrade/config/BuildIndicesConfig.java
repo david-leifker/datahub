@@ -1,6 +1,7 @@
 package com.linkedin.datahub.upgrade.config;
 
 import com.linkedin.datahub.upgrade.buildindices.BuildIndices;
+import com.linkedin.gms.factory.config.ConfigurationProvider;
 import com.linkedin.gms.factory.search.BaseElasticSearchComponentsFactory;
 import com.linkedin.metadata.graph.GraphService;
 import com.linkedin.metadata.models.registry.EntityRegistry;
@@ -22,9 +23,9 @@ public class BuildIndicesConfig {
       final EntitySearchService entitySearchService, final GraphService graphService,
       final BaseElasticSearchComponentsFactory.BaseElasticSearchComponents baseElasticSearchComponents,
       final EntityRegistry entityRegistry, final Producer<String, ? extends IndexedRecord> producer,
-      final TopicConvention convention, final GitVersion gitVersion) {
+      final TopicConvention convention, final GitVersion gitVersion, final ConfigurationProvider configurationProvider) {
 
     return new BuildIndices(systemMetadataService, timeseriesAspectService, entitySearchService, graphService,
-        baseElasticSearchComponents, entityRegistry, producer, convention, gitVersion);
+        baseElasticSearchComponents, entityRegistry, producer, convention, gitVersion, configurationProvider);
   }
 }

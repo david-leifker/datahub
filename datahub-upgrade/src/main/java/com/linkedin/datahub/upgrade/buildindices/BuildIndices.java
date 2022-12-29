@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.linkedin.datahub.upgrade.Upgrade;
 import com.linkedin.datahub.upgrade.UpgradeCleanupStep;
 import com.linkedin.datahub.upgrade.UpgradeStep;
+import com.linkedin.gms.factory.config.ConfigurationProvider;
 import com.linkedin.gms.factory.search.BaseElasticSearchComponentsFactory;
 import com.linkedin.metadata.dao.producer.KafkaEventProducer;
 import com.linkedin.metadata.graph.GraphService;
@@ -27,10 +28,10 @@ public class BuildIndices implements Upgrade {
         final EntitySearchService entitySearchService, final GraphService graphService,
         final BaseElasticSearchComponentsFactory.BaseElasticSearchComponents baseElasticSearchComponents,
         final EntityRegistry entityRegistry, final Producer<String, ? extends IndexedRecord> producer,
-        final TopicConvention convention, final GitVersion gitVersion) {
+        final TopicConvention convention, final GitVersion gitVersion, final ConfigurationProvider configurationProvider) {
       final KafkaEventProducer kafkaEventProducer = new KafkaEventProducer(producer, convention);
       _steps = buildSteps(systemMetadataService, timeseriesAspectService, entitySearchService, graphService,
-          baseElasticSearchComponents, entityRegistry, kafkaEventProducer, gitVersion);
+          baseElasticSearchComponents, entityRegistry, kafkaEventProducer, gitVersion, configurationProvider);
     }
 
     @Override
@@ -46,10 +47,11 @@ public class BuildIndices implements Upgrade {
     private List<UpgradeStep> buildSteps(final SystemMetadataService systemMetadataService, final TimeseriesAspectService
         timeseriesAspectService, final EntitySearchService entitySearchService, final GraphService graphService,
         final BaseElasticSearchComponentsFactory.BaseElasticSearchComponents baseElasticSearchComponents,
-        final EntityRegistry entityRegistry, final KafkaEventProducer eventProducer, final GitVersion gitVersion) {
+        final EntityRegistry entityRegistry, final KafkaEventProducer eventProducer, final GitVersion gitVersion,
+        final ConfigurationProvider configurationProvider) {
       final List<UpgradeStep> steps = new ArrayList<>();
       // Disable ES write mode/change refresh rate and clone indices
-      steps.add(new PreConfigureESStep(baseElasticSearchComponents, entityRegistry));
+      steps.add(new PreConfigureESStep(baseElasticSearchComponents, entityRegistry, configurationProvider));
       // Configure graphService, entitySearchService, systemMetadataService, timeseriesAspectService
       steps.add(new BuildIndicesStep(graphService, entitySearchService, systemMetadataService, timeseriesAspectService));
       // Reset configuration (and delete clones? Or just do this regularly? Or delete clone in pre-configure step if it already exists?
