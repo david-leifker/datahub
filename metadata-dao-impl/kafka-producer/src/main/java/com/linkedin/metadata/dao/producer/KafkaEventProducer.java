@@ -7,6 +7,7 @@ import com.linkedin.metadata.EventUtils;
 import com.linkedin.metadata.event.EventProducer;
 import com.linkedin.metadata.models.AspectSpec;
 import com.linkedin.metadata.snapshot.Snapshot;
+import com.linkedin.mxe.BuildIndicesHistoryEvent;
 import com.linkedin.mxe.MetadataAuditEvent;
 import com.linkedin.mxe.MetadataAuditOperation;
 import com.linkedin.mxe.MetadataChangeLog;
@@ -218,6 +219,31 @@ public class KafkaEventProducer implements EventProducer {
 
     final String topic = _topicConvention.getPlatformEventTopicName();
     _producer.send(new ProducerRecord(topic, key == null ? name : key, record), callback);
+  }
+
+  @Override
+  public void produceBuildIndicesHistoryEvent(@Nonnull BuildIndicesHistoryEvent event) {
+    GenericRecord record;
+    try {
+      log.debug(String.format("Converting Pegasus Event to Avro Event\nEvent: %s", event));
+      record = EventUtils.pegasusToAvroBIHE(event);
+    } catch (IOException e) {
+      log.error(String.format("Failed to convert Pegasus Build Indices History Event to Avro: %s", event), e);
+      throw new ModelConversionException("Failed to convert Pegasus Platform Event to Avro", e);
+    }
+
+    final Callback callback = _callback.orElseGet(() -> (metadata, e) -> {
+      if (e != null) {
+        log.error(String.format("Failed to emit Build Indices History Event with version %s", event.getVersion()), e);
+      } else {
+        log.debug(String.format(
+            "Successfully emitted Build Indices History Event for version %s at offset %s, partition %s, topic %s",
+            event.getVersion(), metadata.offset(), metadata.partition(), metadata.topic()));
+      }
+    });
+
+    final String topic = _topicConvention.getBuildIndicesHistoryTopicName();
+    _producer.send(new ProducerRecord(topic, event.getVersion(), record), callback);
   }
 
   @VisibleForTesting

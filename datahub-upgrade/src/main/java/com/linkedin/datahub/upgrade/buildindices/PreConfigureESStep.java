@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.elasticsearch.ElasticsearchStatusException;
 import org.elasticsearch.action.admin.indices.settings.put.UpdateSettingsRequest;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.indices.ResizeRequest;
@@ -43,18 +44,28 @@ public class PreConfigureESStep implements UpgradeStep {
         // Get indices to update
         List<String> indexNames = getAllIndexNames(_esComponents, _entityRegistry);
 
-        // Set refresh interval
-        String refreshIntervalSeconds = "60s";
         for (String indexName : indexNames) {
           UpdateSettingsRequest request = new UpdateSettingsRequest(indexName);
-          Map<String, Object> indexSettings = ImmutableMap.of("index.refresh_interval", refreshIntervalSeconds);
+          Map<String, Object> indexSettings = ImmutableMap.of("index.blocks.write", "true");
 
           request.settings(indexSettings);
-          boolean ack = _esComponents.getSearchClient().indices().putSettings(request, RequestOptions.DEFAULT).isAcknowledged();
+          boolean ack;
+          try {
+            ack =
+                _esComponents.getSearchClient().indices().putSettings(request, RequestOptions.DEFAULT).isAcknowledged();
+          } catch (ElasticsearchStatusException ese) {
+            // Cover first run case, indices won't exist so settings updates won't work nor will the rest of the preConfigure steps.
+            // Since no data are in there they are skippable.
+            // Have to hack around HighLevelClient not sending the actual Java type nor having an easy way to extract it :(
+            if (ese.getMessage().contains("index_not_found")) {
+              continue;
+            }
+            throw ese;
+          }
           log.info("Updated index {} with new settings. Settings: {}, Acknowledged: {}", indexName, indexSettings, ack);
           if (!ack) {
-            log.error("Partial index settings update, please validate current settings for refresh interval: {} Original setting: {}",
-                indexNames, _esComponents.getIndexBuilder().getRefreshIntervalSeconds());
+            log.error("Partial index settings update, some indices may still be blocking writes."
+                + " Please fix the error and re-run the BuildIndices upgrade job.");
             return new DefaultUpgradeStepResult(id(), UpgradeStepResult.Result.FAILED);
           }
 
@@ -69,6 +80,7 @@ public class PreConfigureESStep implements UpgradeStep {
           }
         }
       } catch (Exception e) {
+        log.error("PreConfigureESStep failed.", e);
         return new DefaultUpgradeStepResult(id(), UpgradeStepResult.Result.FAILED);
       }
       return new DefaultUpgradeStepResult(id(), UpgradeStepResult.Result.SUCCEEDED);

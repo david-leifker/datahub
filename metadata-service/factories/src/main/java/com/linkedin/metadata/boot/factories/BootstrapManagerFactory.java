@@ -1,12 +1,14 @@
 package com.linkedin.metadata.boot.factories;
 
 import com.google.common.collect.ImmutableList;
+import com.linkedin.gms.factory.config.ConfigurationProvider;
 import com.linkedin.gms.factory.entity.EntityServiceFactory;
 import com.linkedin.gms.factory.entityregistry.EntityRegistryFactory;
 import com.linkedin.gms.factory.search.EntitySearchServiceFactory;
 import com.linkedin.gms.factory.search.SearchDocumentTransformerFactory;
 import com.linkedin.metadata.boot.BootstrapManager;
 import com.linkedin.metadata.boot.BootstrapStep;
+import com.linkedin.metadata.boot.dependencies.BootstrapDependency;
 import com.linkedin.metadata.boot.steps.IndexDataPlatformsStep;
 import com.linkedin.metadata.boot.steps.IngestDataPlatformInstancesStep;
 import com.linkedin.metadata.boot.steps.IngestDataPlatformsStep;
@@ -19,6 +21,7 @@ import com.linkedin.metadata.boot.steps.RestoreColumnLineageIndices;
 import com.linkedin.metadata.boot.steps.RestoreDbtSiblingsIndices;
 import com.linkedin.metadata.boot.steps.RestoreGlossaryIndices;
 import com.linkedin.metadata.boot.steps.UpgradeDefaultBrowsePathsStep;
+import com.linkedin.metadata.boot.steps.WaitForBuildIndicesStep;
 import com.linkedin.metadata.entity.AspectMigrationsDao;
 import com.linkedin.metadata.entity.EntityService;
 import com.linkedin.metadata.models.registry.EntityRegistry;
@@ -65,6 +68,13 @@ public class BootstrapManagerFactory {
   @Qualifier("ingestRetentionPoliciesStep")
   private IngestRetentionPoliciesStep _ingestRetentionPoliciesStep;
 
+  @Autowired
+  @Qualifier("buildIndicesKafkaListener")
+  private BootstrapDependency _buildIndicesKafkaListener;
+
+  @Autowired
+  private ConfigurationProvider _configurationProvider;
+
   @Value("${bootstrap.upgradeDefaultBrowsePaths.enabled}")
   private Boolean _upgradeDefaultBrowsePathsEnabled;
 
@@ -87,10 +97,11 @@ public class BootstrapManagerFactory {
         new RestoreDbtSiblingsIndices(_entityService, _entityRegistry);
     final RemoveClientIdAspectStep removeClientIdAspectStep = new RemoveClientIdAspectStep(_entityService);
     final RestoreColumnLineageIndices restoreColumnLineageIndices = new RestoreColumnLineageIndices(_entityService, _entityRegistry);
+    final WaitForBuildIndicesStep waitForBuildIndicesStep = new WaitForBuildIndicesStep(_buildIndicesKafkaListener, _configurationProvider);
 
     final List<BootstrapStep> finalSteps = new ArrayList<>(ImmutableList.of(ingestRootUserStep, ingestPoliciesStep, ingestRolesStep,
         ingestDataPlatformsStep, ingestDataPlatformInstancesStep, _ingestRetentionPoliciesStep, restoreGlossaryIndicesStep,
-        removeClientIdAspectStep, restoreDbtSiblingsIndices, indexDataPlatformsStep, restoreColumnLineageIndices));
+        removeClientIdAspectStep, restoreDbtSiblingsIndices, indexDataPlatformsStep, restoreColumnLineageIndices, waitForBuildIndicesStep));
 
     if (_upgradeDefaultBrowsePathsEnabled) {
       finalSteps.add(new UpgradeDefaultBrowsePathsStep(_entityService));
