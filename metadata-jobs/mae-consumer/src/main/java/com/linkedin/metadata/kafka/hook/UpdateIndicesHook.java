@@ -22,6 +22,7 @@ import com.linkedin.gms.factory.timeseries.TimeseriesAspectServiceFactory;
 import com.linkedin.metadata.Constants;
 import com.linkedin.metadata.graph.Edge;
 import com.linkedin.metadata.graph.GraphService;
+import com.linkedin.metadata.kafka.config.MetadataChangeLogProcessorCondition;
 import com.linkedin.metadata.kafka.elasticsearch.indices.BuildIndicesKafkaListener;
 import com.linkedin.metadata.key.SchemaFieldKey;
 import com.linkedin.metadata.models.AspectSpec;
@@ -60,6 +61,7 @@ import javax.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Import;
 import org.springframework.stereotype.Component;
 
@@ -68,6 +70,7 @@ import static com.linkedin.metadata.search.utils.QueryUtils.*;
 // TODO: Backfill tests for this class in UpdateIndicesHookTest.java
 @Slf4j
 @Component
+@Conditional(MetadataChangeLogProcessorCondition.class)
 @Import({GraphServiceFactory.class, EntitySearchServiceFactory.class, TimeseriesAspectServiceFactory.class,
     EntityRegistryFactory.class, SystemMetadataServiceFactory.class, SearchDocumentTransformerFactory.class})
 public class UpdateIndicesHook implements MetadataChangeLogHook {
