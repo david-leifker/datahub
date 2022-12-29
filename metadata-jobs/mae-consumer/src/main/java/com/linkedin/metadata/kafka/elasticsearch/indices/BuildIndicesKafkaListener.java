@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 
 // We don't disable this on GMS since we want GMS to also wait until the indices are ready to read in case of
 // backwards incompatible query logic dependent on index updates.
-@Component("buildIndiceskafkaListener")
+@Component("buildIndicesKafkaListener")
 @RequiredArgsConstructor
 @Slf4j
 @EnableKafka
@@ -46,7 +46,7 @@ public class BuildIndicesKafkaListener implements ConsumerSeekAware, BootstrapDe
   private AtomicBoolean isUpdated = new AtomicBoolean(false);
 
 
-  // Constructs a consumer to read determine final offset to assign, prevents re-reading whole topic to get the latest version
+  // Constructs a temp consumer to read and determine final offset to assign, prevents re-reading whole topic to get the latest version
   @Override
   public void onPartitionsAssigned(Map<TopicPartition, Long> assignments, ConsumerSeekCallback callback) {
     try (Consumer<String, GenericRecord> kafkaConsumer =
