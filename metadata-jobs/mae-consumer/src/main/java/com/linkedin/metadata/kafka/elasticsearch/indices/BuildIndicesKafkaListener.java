@@ -93,6 +93,7 @@ public class BuildIndicesKafkaListener implements ConsumerSeekAware, BootstrapDe
         return;
       }
       try {
+        log.info("Indices not yet updated, sleeping for {} ms", backOffMs);
         Thread.sleep(backOffMs);
       } catch (InterruptedException e) {
         log.error("Thread interrupted while sleeping for exponential backoff: {}", e.getMessage());
