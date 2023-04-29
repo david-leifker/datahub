@@ -31,7 +31,7 @@ public class ElasticsearchConnector {
       _bulkProcessor.add(createDeleteRequest(event));
     } else if (event.getActionType().equals(ChangeType.CREATE)) {
       if (allowReplacement) {
-        createIndexRequestWithReplace(event);
+        _bulkProcessor.add(createIndexRequestWithReplace(event));
       } else {
         _bulkProcessor.add(createIndexRequest(event));
       }
