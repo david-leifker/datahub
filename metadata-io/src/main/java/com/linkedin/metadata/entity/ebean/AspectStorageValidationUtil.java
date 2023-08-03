@@ -1,7 +1,7 @@
 package com.linkedin.metadata.entity.ebean;
 
 import com.linkedin.metadata.Constants;
-import io.ebean.EbeanServer;
+import io.ebean.Database;
 import io.ebean.SqlQuery;
 import io.ebean.SqlRow;
 
@@ -16,18 +16,18 @@ public class AspectStorageValidationUtil {
 
   }
 
-  public static long getV1RowCount(EbeanServer server) {
+  public static long getV1RowCount(Database server) {
     return server.find(EbeanAspectV1.class).findCount();
   }
 
   /**
    * Get the number of rows created not by the DataHub system actor (urn:li:corpuser:__datahub_system)
    */
-  public static long getV2NonSystemRowCount(EbeanServer server) {
+  public static long getV2NonSystemRowCount(Database server) {
     return server.find(EbeanAspectV2.class).where(ne("createdby", Constants.SYSTEM_ACTOR)).findCount();
   }
 
-  public static boolean checkV2TableExists(EbeanServer server) {
+  public static boolean checkV2TableExists(Database server) {
     final String queryStr =
         "SELECT * FROM INFORMATION_SCHEMA.TABLES \n"
             + "WHERE TABLE_NAME = 'metadata_aspect_v2'";
@@ -37,7 +37,7 @@ public class AspectStorageValidationUtil {
     return rows.size() > 0;
   }
 
-  public static boolean checkV1TableExists(EbeanServer server) {
+  public static boolean checkV1TableExists(Database server) {
     final String queryStr =
         "SELECT * FROM INFORMATION_SCHEMA.TABLES \n"
             + "WHERE TABLE_NAME = 'metadata_aspect'";

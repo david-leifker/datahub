@@ -19,7 +19,7 @@ import com.linkedin.metadata.query.ListUrnsResult;
 import com.linkedin.metadata.service.UpdateIndicesService;
 import com.linkedin.metadata.utils.PegasusUtils;
 import com.linkedin.mxe.SystemMetadata;
-import io.ebean.EbeanServer;
+import io.ebean.Database;
 import io.ebean.Transaction;
 import io.ebean.TxScope;
 import io.ebean.annotation.TxIsolation;
@@ -48,7 +48,7 @@ public class EbeanEntityServiceTest extends EntityServiceTest<EbeanAspectDao, Eb
 
   @BeforeMethod
   public void setupTest() {
-    EbeanServer server = EbeanTestUtils.createTestServer();
+    Database server = EbeanTestUtils.createTestServer();
     _mockProducer = mock(EventProducer.class);
     _aspectDao = new EbeanAspectDao(server);
     _aspectDao.setConnectionValidated(true);
@@ -205,7 +205,7 @@ public class EbeanEntityServiceTest extends EntityServiceTest<EbeanAspectDao, Eb
   @Override
   @Test
   public void testNestedTransactions() throws AssertionError {
-    EbeanServer server = _aspectDao.getServer();
+    Database server = _aspectDao.getServer();
 
     try (Transaction transaction = server.beginTransaction(TxScope.requiresNew()
         .setIsolation(TxIsolation.REPEATABLE_READ))) {
