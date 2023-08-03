@@ -490,6 +490,9 @@ jobs:
         if: ${{ needs.setup.outputs.publish != 'true' }}
         with:
           image: ${{ env.DATAHUB_UPGRADE_IMAGE }}:${{ needs.setup.outputs.unique_tag }}
+      - name: Disable datahub-actions
+        run: |
+          yq -i 'del(.services.datahub-actions)' docker/quickstart/docker-compose-without-neo4j.quickstart.yml
       - name: run quickstart
         env:
           DATAHUB_TELEMETRY_ENABLED: false
