@@ -15,7 +15,6 @@ idea {
   }
 }
 
-
 configurations {
   integTestImplementation.extendsFrom implementation
   integTestRuntimeOnly.extendsFrom runtimeOnly

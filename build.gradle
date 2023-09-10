@@ -1,7 +1,7 @@
 buildscript {
   ext.junitJupiterVersion = '5.6.1'
   // Releases: https://github.com/linkedin/rest.li/blob/master/CHANGELOG.md
-  ext.pegasusVersion = '29.45.0'
+  ext.pegasusVersion = '29.46.0-rc.2'
   ext.mavenVersion = '3.6.3'
   ext.springVersion = '5.3.29'
   ext.springBootVersion = '2.7.14'
@@ -26,7 +26,7 @@ buildscript {
   buildscript.repositories.addAll(project.repositories)
   dependencies {
     classpath 'com.linkedin.pegasus:gradle-plugins:' + pegasusVersion
-    classpath 'com.github.node-gradle:gradle-node-plugin:2.2.4'
+    classpath 'com.github.node-gradle:gradle-node-plugin:5.0.0'
     classpath 'io.acryl.gradle.plugin:gradle-avro-plugin:0.8.1'
     classpath 'org.springframework.boot:spring-boot-gradle-plugin:' + springBootVersion
     classpath "io.codearte.gradle.nexus:gradle-nexus-staging-plugin:0.30.0"
@@ -38,7 +38,7 @@ buildscript {
 
 plugins {
   id 'com.gorylenko.gradle-git-properties' version '2.4.0-rc2'
-  id 'com.github.johnrengelman.shadow' version '6.1.0'
+  id 'com.github.johnrengelman.shadow' version '7.1.2'
   id 'com.palantir.docker' version '0.35.0'
   // https://blog.ltgt.net/javax-jakarta-mess-and-gradle-solution/
   // TODO id "org.gradlex.java-ecosystem-capabilities" version "1.0"
@@ -146,7 +146,7 @@ project.ext.externalDependency = [
     'log4jApi': "org.apache.logging.log4j:log4j-api:$log4jVersion",
     'log4j12Api': "org.slf4j:log4j-over-slf4j:$slf4jVersion",
     'log4j2Api': "org.apache.logging.log4j:log4j-to-slf4j:$log4jVersion",
-    'lombok': 'org.projectlombok:lombok:1.18.16',
+    'lombok': 'org.projectlombok:lombok:1.18.22',
     'mariadbConnector': 'org.mariadb.jdbc:mariadb-java-client:2.6.0',
     'mavenArtifact': "org.apache.maven:maven-artifact:$mavenVersion",
     'mixpanel': 'com.mixpanel:mixpanel-java:1.4.4',
@@ -285,12 +285,12 @@ subprojects {
 
   tasks.withType(JavaCompile).configureEach {
     javaCompiler = javaToolchains.compilerFor {
-      languageVersion = JavaLanguageVersion.of(11)
+      languageVersion = JavaLanguageVersion.of(17)
     }
   }
   tasks.withType(Test).configureEach {
     javaLauncher = javaToolchains.launcherFor {
-      languageVersion = JavaLanguageVersion.of(11)
+      languageVersion = JavaLanguageVersion.of(17)
     }
   }
 
