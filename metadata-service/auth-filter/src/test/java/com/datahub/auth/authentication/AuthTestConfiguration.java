@@ -2,7 +2,6 @@ package com.datahub.auth.authentication;
 
 import static org.mockito.Mockito.*;
 
-import com.datahub.auth.authentication.filter.AuthenticationFilter;
 import com.datahub.authentication.AuthenticationConfiguration;
 import com.datahub.authentication.AuthenticatorConfiguration;
 import com.datahub.authentication.TokenServiceConfiguration;
@@ -15,12 +14,12 @@ import com.linkedin.metadata.entity.EntityService;
 import io.datahubproject.test.metadata.context.TestOperationContexts;
 import java.util.List;
 import java.util.Map;
-import javax.servlet.ServletException;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
 
 @Configuration
+@ComponentScan(basePackages = "com.datahub.auth.authentication.filter")
 public class AuthTestConfiguration {
 
   @Bean
@@ -74,12 +73,5 @@ public class AuthTestConfiguration {
     dataHubConfiguration.setPlugin(pluginConfiguration);
     configurationProvider.setDatahub(dataHubConfiguration);
     return configurationProvider;
-  }
-
-  @Bean
-  // TODO: Constructor injection
-  @DependsOn({"configurationProvider", "dataHubTokenService", "entityService"})
-  public AuthenticationFilter authenticationFilter() throws ServletException {
-    return new AuthenticationFilter();
   }
 }

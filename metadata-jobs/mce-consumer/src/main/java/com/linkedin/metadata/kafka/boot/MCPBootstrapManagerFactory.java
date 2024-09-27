@@ -31,7 +31,7 @@ public class MCPBootstrapManagerFactory {
   @Nonnull
   protected BootstrapManager createInstance() {
     final WaitForSystemUpdateStep waitForSystemUpdateStep =
-        new WaitForSystemUpdateStep(_dataHubUpgradeKafkaListener, _configurationProvider);
+        new WaitForSystemUpdateStep(_dataHubUpgradeKafkaListener);
 
     final List<BootstrapStep> finalSteps = ImmutableList.of(waitForSystemUpdateStep);
 

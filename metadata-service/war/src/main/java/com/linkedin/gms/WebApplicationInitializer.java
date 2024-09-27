@@ -18,16 +18,20 @@ import jakarta.servlet.ServletRegistration;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.context.ContextLoaderListener;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.context.support.HttpRequestHandlerServlet;
 import org.springframework.web.servlet.DispatcherServlet;
 
 /** This class is before Spring Context is loaded, previously web.xml based */
+@Slf4j
 public class WebApplicationInitializer
     implements org.springframework.web.WebApplicationInitializer {
   @Override
   public void onStartup(ServletContext container) {
+    log.info("WebApplicationInitializer onStartup");
+
     AnnotationConfigWebApplicationContext rootContext = new AnnotationConfigWebApplicationContext();
     rootContext.register(CommonApplicationConfig.class);
 

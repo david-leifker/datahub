@@ -16,8 +16,10 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.Schema;
 
+@Slf4j
 public class SchemaRegistryServiceImpl implements SchemaRegistryService {
 
   @AllArgsConstructor
@@ -81,6 +83,8 @@ public class SchemaRegistryServiceImpl implements SchemaRegistryService {
         convention.getMetadataAuditEventTopicName(), TopicOrdinal.MAE_TOPIC.getSchema());
     this._subjectToIdMap.put(
         convention.getMetadataAuditEventTopicName(), TopicOrdinal.MAE_TOPIC.ordinal());
+
+    log.info("Constructed SchemaRegistryService");
   }
 
   @Override

@@ -1,6 +1,5 @@
 package com.linkedin.metadata.boot.steps;
 
-import com.linkedin.gms.factory.config.ConfigurationProvider;
 import com.linkedin.metadata.boot.BootstrapStep;
 import com.linkedin.metadata.boot.dependencies.BootstrapDependency;
 import io.datahubproject.metadata.context.OperationContext;
@@ -11,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 public class WaitForSystemUpdateStep implements BootstrapStep {
 
   private final BootstrapDependency _dataHubUpgradeKafkaListener;
-  private final ConfigurationProvider _enableWaitForSystemUpdate;
 
   @Override
   public String name() {

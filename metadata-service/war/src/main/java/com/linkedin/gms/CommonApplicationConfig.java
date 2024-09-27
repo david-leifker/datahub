@@ -1,8 +1,6 @@
 package com.linkedin.gms;
 
-import com.datahub.auth.authentication.filter.AuthenticationFilter;
 import com.linkedin.metadata.spring.YamlPropertySourceFactory;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
@@ -40,14 +38,9 @@ import org.springframework.context.annotation.PropertySource;
       "com.linkedin.gms.factory.plugins",
       "com.linkedin.gms.factory.change",
       "com.datahub.event.hook",
-      "com.linkedin.gms.factory.notifications"
+      "com.linkedin.gms.factory.notifications",
+      "com.datahub.auth.authentication.filter"
     })
 @PropertySource(value = "classpath:/application.yaml", factory = YamlPropertySourceFactory.class)
 @Configuration
-public class CommonApplicationConfig {
-
-  @Bean("authenticationFilter")
-  public AuthenticationFilter authenticationFilter() {
-    return new AuthenticationFilter();
-  }
-}
+public class CommonApplicationConfig {}

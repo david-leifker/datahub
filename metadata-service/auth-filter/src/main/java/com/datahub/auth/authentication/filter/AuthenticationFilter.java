@@ -28,13 +28,9 @@ import com.datahub.plugins.loader.PluginPermissionManagerImpl;
 import com.google.common.collect.ImmutableMap;
 import com.linkedin.gms.factory.config.ConfigurationProvider;
 import com.linkedin.metadata.entity.EntityService;
-import jakarta.inject.Named;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
-import jakarta.servlet.FilterConfig;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -47,46 +43,53 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.context.support.SpringBeanAutowiringSupport;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * A servlet {@link Filter} for authenticating requests inbound to the Metadata Service. This filter
  * is applied to the GraphQL Servlet, the Rest.li Servlet, and the Auth (token) Servlet.
  */
 @Slf4j
-public class AuthenticationFilter implements Filter {
+@Component
+@Qualifier("authenticationFilter")
+public class AuthenticationFilter extends OncePerRequestFilter implements Filter {
 
-  @Autowired private ConfigurationProvider configurationProvider;
-
-  @Autowired
-  @Named("entityService")
-  private EntityService<?> _entityService;
-
-  @Autowired
-  @Named("dataHubTokenService")
-  private StatefulTokenService _tokenService;
-
-  @Value("#{new Boolean('${authentication.logAuthenticatorExceptions}')}")
-  private boolean _logAuthenticatorExceptions;
+  private final ConfigurationProvider configurationProvider;
+  private final EntityService<?> entityService;
+  private final StatefulTokenService tokenService;
+  private final boolean logAuthenticatorExceptions;
 
   private AuthenticatorChain authenticatorChain;
 
+  public AuthenticationFilter(
+      final ConfigurationProvider configurationProvider,
+      @Qualifier("entityService") final EntityService<?> entityService,
+      @Qualifier("dataHubTokenService") final StatefulTokenService tokenService,
+      @Value("#{new Boolean('${authentication.logAuthenticatorExceptions}')}")
+          final boolean logAuthenticatorExceptions) {
+    this.configurationProvider = configurationProvider;
+    this.entityService = entityService;
+    this.tokenService = tokenService;
+    this.logAuthenticatorExceptions = logAuthenticatorExceptions;
+  }
+
   @Override
-  public void init(FilterConfig filterConfig) throws ServletException {
-    SpringBeanAutowiringSupport.processInjectionBasedOnCurrentContext(this);
+  protected void initFilterBean() throws ServletException {
     buildAuthenticatorChain();
     log.info("AuthenticationFilter initialized.");
   }
 
   @Override
-  public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-      throws IOException, ServletException {
+  protected void doFilterInternal(
+      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+      throws ServletException, IOException {
     AuthenticationRequest context = buildAuthContext((HttpServletRequest) request);
     Authentication authentication = null;
     try {
-      authentication = this.authenticatorChain.authenticate(context, _logAuthenticatorExceptions);
+      authentication = this.authenticatorChain.authenticate(context, logAuthenticatorExceptions);
     } catch (AuthenticationException e) {
       // For AuthenticationExpiredExceptions, terminate and provide that feedback to the user
       log.debug(
@@ -104,7 +107,7 @@ public class AuthenticationFilter implements Filter {
               "Successfully authenticated request for Actor with type: %s, id: %s",
               authentication.getActor().getType(), authentication.getActor().getId()));
       AuthenticationContext.setAuthentication(authentication);
-      chain.doFilter(request, response);
+      filterChain.doFilter(request, response);
     } else {
       // Reject request
       log.debug(
@@ -139,8 +142,7 @@ public class AuthenticationFilter implements Filter {
     // needed.
     final AuthenticatorContext authenticatorContext =
         new AuthenticatorContext(
-            ImmutableMap.of(
-                ENTITY_SERVICE, this._entityService, TOKEN_SERVICE, this._tokenService));
+            ImmutableMap.of(ENTITY_SERVICE, this.entityService, TOKEN_SERVICE, this.tokenService));
 
     if (isAuthEnabled) {
       log.info("Auth is enabled. Building authenticator chain...");

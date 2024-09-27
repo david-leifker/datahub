@@ -14,6 +14,7 @@ ext.apiProject = project(':metadata-service:restli-api')
 dependencies {
   implementation project(':metadata-service:factories')
   implementation project(':metadata-service:auth-filter')
+  implementation project(':metadata-service:auth-impl')
   implementation project(':metadata-service:servlet')
   implementation project(':metadata-service:auth-servlet-impl')
   implementation project(':metadata-service:graphql-servlet-impl')
@@ -37,6 +38,8 @@ dependencies {
   implementation spec.product.pegasus.restliDocgen
   implementation spec.product.pegasus.restliSpringBridge
 
+  annotationProcessor externalDependency.lombok
+  compileOnly externalDependency.lombok
   runtimeOnly externalDependency.log4jCore
   runtimeOnly externalDependency.log4j2Api
   runtimeOnly externalDependency.logbackClassic

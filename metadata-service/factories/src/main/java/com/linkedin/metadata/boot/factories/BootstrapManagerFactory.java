@@ -120,7 +120,7 @@ public class BootstrapManagerFactory {
     final IngestDefaultGlobalSettingsStep ingestSettingsStep =
         new IngestDefaultGlobalSettingsStep(_entityService);
     final WaitForSystemUpdateStep waitForSystemUpdateStep =
-        new WaitForSystemUpdateStep(_dataHubUpgradeKafkaListener, _configurationProvider);
+        new WaitForSystemUpdateStep(_dataHubUpgradeKafkaListener);
     final IngestOwnershipTypesStep ingestOwnershipTypesStep =
         new IngestOwnershipTypesStep(_entityService, _ownershipTypesResource);
     final IngestDataTypesStep ingestDataTypesStep = new IngestDataTypesStep(_entityService);

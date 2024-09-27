@@ -29,7 +29,6 @@ public class AuthenticationFilterTest extends AbstractTestNGSpringContextTests {
 
   @Test
   public void testExpiredToken() throws ServletException, IOException, TokenException {
-    _authenticationFilter.init(null);
     HttpServletRequest servletRequest = mock(HttpServletRequest.class);
     HttpServletResponse servletResponse = mock(HttpServletResponse.class);
     FilterChain filterChain = mock(FilterChain.class);
