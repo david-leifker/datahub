@@ -76,7 +76,7 @@ public class GraphIndexUtilsTest {
       // check specifically for the upstreams relationship entry
       if (entry.getKey().getPath().toString().equals(UPSTREAM_RELATIONSHIP_PATH)) {
         List<Edge> edgesToAdd =
-            GraphIndexUtils.extractGraphEdges(entry, upstreamLineage, _datasetUrn, event, true);
+            EdgeBuilder.extractGraphEdges(entry, upstreamLineage, _datasetUrn, event, true);
         List<Edge> expectedEdgesToAdd = new ArrayList<>();
         // edges contain default created event time and created actor from system metadata
         Edge edge1 =

@@ -42,61 +42,6 @@ public class Edge {
   @EqualsAndHashCode.Exclude @Nullable private Boolean viaStatus;
   @EqualsAndHashCode.Exclude @Nullable private Boolean lifecycleOwnerStatus;
 
-  // For backwards compatibility
-  public Edge(
-      Urn source,
-      Urn destination,
-      String relationshipType,
-      Long createdOn,
-      Urn createdActor,
-      Long updatedOn,
-      Urn updatedActor,
-      Map<String, Object> properties) {
-    this(
-        source,
-        destination,
-        relationshipType,
-        createdOn,
-        createdActor,
-        updatedOn,
-        updatedActor,
-        properties,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null);
-  }
-
-  public Edge(
-      Urn source,
-      Urn destination,
-      String relationshipType,
-      Long createdOn,
-      Urn createdActor,
-      Long updatedOn,
-      Urn updatedActor,
-      Map<String, Object> properties,
-      Urn lifecycleOwner,
-      Urn via) {
-    this(
-        source,
-        destination,
-        relationshipType,
-        createdOn,
-        createdActor,
-        updatedOn,
-        updatedActor,
-        properties,
-        lifecycleOwner,
-        via,
-        null,
-        null,
-        null,
-        null);
-  }
-
   public String toDocId(@Nonnull String idHashAlgo) {
     StringBuilder rawDocId = new StringBuilder();
     rawDocId

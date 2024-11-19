@@ -23,6 +23,7 @@ import com.linkedin.metadata.aspect.models.graph.Edge;
 import com.linkedin.metadata.aspect.models.graph.EdgeUrnType;
 import com.linkedin.metadata.entity.SearchIndicesService;
 import com.linkedin.metadata.entity.ebean.batch.MCLItemImpl;
+import com.linkedin.metadata.graph.EdgeBuilder;
 import com.linkedin.metadata.graph.GraphIndexUtils;
 import com.linkedin.metadata.graph.GraphService;
 import com.linkedin.metadata.graph.dgraph.DgraphGraphService;
@@ -158,7 +159,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
         && (systemMetadata == null
             || systemMetadata.getProperties() == null
             || !Boolean.parseBoolean(systemMetadata.getProperties().get(FORCE_INDEXING_KEY)))) {
-      updateGraphServiceDiff(urn, aspectSpec, previousAspect, aspect, event.getMetadataChangeLog());
+      updateGraphServiceDiff(opContext, urn, aspectSpec, previousAspect, aspect, event.getMetadataChangeLog());
     } else {
       updateGraphService(opContext, urn, aspectSpec, aspect, event.getMetadataChangeLog());
     }
@@ -201,6 +202,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
 
   // TODO: remove this method once we implement sourceOverride when creating graph edges
   private void updateFineGrainedEdgesAndRelationships(
+      @Nonnull OperationContext opContext,
       Urn entity,
       FineGrainedLineageArray fineGrainedLineageArray,
       List<Edge> edgesToAdd,
@@ -220,7 +222,8 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
           for (Urn upstream : fineGrainedLineage.getUpstreams()) {
             // TODO: add edges uniformly across aspects
             edgesToAdd.add(
-                new Edge(
+                EdgeBuilder.build(
+                    opContext,
                     downstream,
                     upstream,
                     DOWNSTREAM_OF,
@@ -243,6 +246,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
 
   // TODO: remove this method once we implement sourceOverride and update inputFields aspect
   private void updateInputFieldEdgesAndRelationships(
+      @Nonnull OperationContext opContext,
       @Nonnull final Urn urn,
       @Nonnull final InputFields inputFields,
       @Nonnull final List<Edge> edgesToAdd,
@@ -256,7 +260,8 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
               SchemaFieldUtils.generateSchemaFieldUrn(urn, field.getSchemaField().getFieldPath());
           // TODO: add edges uniformly across aspects
           edgesToAdd.add(
-              new Edge(
+              EdgeBuilder.build(
+                  opContext,
                   sourceFieldUrn,
                   field.getSchemaFieldUrn(),
                   DOWNSTREAM_OF,
@@ -275,6 +280,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
   }
 
   private Pair<List<Edge>, HashMap<Urn, Set<String>>> getEdgesAndRelationshipTypesFromAspect(
+          @Nonnull OperationContext opContext,
       @Nonnull final Urn urn,
       @Nonnull final AspectSpec aspectSpec,
       @Nonnull final RecordTemplate aspect,
@@ -289,17 +295,18 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
     if (aspectSpec.getName().equals(Constants.UPSTREAM_LINEAGE_ASPECT_NAME)) {
       UpstreamLineage upstreamLineage = new UpstreamLineage(aspect.data());
       updateFineGrainedEdgesAndRelationships(
+              opContext,
           urn,
           upstreamLineage.getFineGrainedLineages(),
           edgesToAdd,
           urnToRelationshipTypesBeingAdded);
     } else if (aspectSpec.getName().equals(Constants.INPUT_FIELDS_ASPECT_NAME)) {
       final InputFields inputFields = new InputFields(aspect.data());
-      updateInputFieldEdgesAndRelationships(
+      updateInputFieldEdgesAndRelationships(opContext,
           urn, inputFields, edgesToAdd, urnToRelationshipTypesBeingAdded);
     } else if (aspectSpec.getName().equals(Constants.DATA_JOB_INPUT_OUTPUT_ASPECT_NAME)) {
       DataJobInputOutput dataJobInputOutput = new DataJobInputOutput(aspect.data());
-      updateFineGrainedEdgesAndRelationships(
+      updateFineGrainedEdgesAndRelationships(opContext,
           urn,
           dataJobInputOutput.getFineGrainedLineages(),
           edgesToAdd,
@@ -315,7 +322,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
       relationshipTypes.add(entry.getKey().getRelationshipName());
       urnToRelationshipTypesBeingAdded.put(urn, relationshipTypes);
       final List<Edge> newEdges =
-          GraphIndexUtils.extractGraphEdges(entry, aspect, urn, event, isNewAspectVersion);
+          EdgeBuilder.extractGraphEdges(opContext, entry, aspect, urn, event, isNewAspectVersion);
       edgesToAdd.addAll(newEdges);
     }
     return Pair.of(edgesToAdd, urnToRelationshipTypesBeingAdded);
@@ -329,7 +336,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
       @Nonnull final RecordTemplate aspect,
       @Nonnull final MetadataChangeLog event) {
     Pair<List<Edge>, HashMap<Urn, Set<String>>> edgeAndRelationTypes =
-        getEdgesAndRelationshipTypesFromAspect(urn, aspectSpec, aspect, event, true);
+        getEdgesAndRelationshipTypesFromAspect(opContext, urn, aspectSpec, aspect, event, true);
 
     final List<Edge> edgesToAdd = edgeAndRelationTypes.getFirst();
     final HashMap<Urn, Set<String>> urnToRelationshipTypesBeingAdded =
@@ -351,6 +358,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
   }
 
   private void updateGraphServiceDiff(
+      @Nonnull final OperationContext opContext,
       @Nonnull final Urn urn,
       @Nonnull final AspectSpec aspectSpec,
       @Nullable final RecordTemplate oldAspect,
@@ -359,7 +367,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
     Pair<List<Edge>, HashMap<Urn, Set<String>>> oldEdgeAndRelationTypes = null;
     if (oldAspect != null) {
       oldEdgeAndRelationTypes =
-          getEdgesAndRelationshipTypesFromAspect(urn, aspectSpec, oldAspect, event, false);
+          getEdgesAndRelationshipTypesFromAspect(opContext, urn, aspectSpec, oldAspect, event, false);
     }
 
     final List<Edge> oldEdges =
@@ -369,7 +377,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
     final Set<Edge> oldEdgeSet = new HashSet<>(oldEdges);
 
     Pair<List<Edge>, HashMap<Urn, Set<String>>> newEdgeAndRelationTypes =
-        getEdgesAndRelationshipTypesFromAspect(urn, aspectSpec, newAspect, event, true);
+        getEdgesAndRelationshipTypesFromAspect(opContext, urn, aspectSpec, newAspect, event, true);
 
     final List<Edge> newEdges = newEdgeAndRelationTypes.getFirst();
     final Set<Edge> newEdgeSet = new HashSet<>(newEdges);
@@ -420,7 +428,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
       for (Edge newEdge : newEdgeSet) {
         if (oldEdgesMap.containsKey(newEdge.hashCode())) {
           final Edge oldEdge = oldEdgesMap.get(newEdge.hashCode());
-          final Edge mergedEdge = GraphIndexUtils.mergeEdges(oldEdge, newEdge);
+          final Edge mergedEdge = EdgeBuilder.mergeEdges(oldEdge, newEdge);
           mergedEdges.add(mergedEdge);
         }
       }
@@ -442,7 +450,7 @@ public class UpdateGraphIndicesService implements SearchIndicesService {
     }
 
     Pair<List<Edge>, HashMap<Urn, Set<String>>> edgeAndRelationTypes =
-        getEdgesAndRelationshipTypesFromAspect(urn, aspectSpec, aspect, event, true);
+        getEdgesAndRelationshipTypesFromAspect(opContext, urn, aspectSpec, aspect, event, true);
 
     final HashMap<Urn, Set<String>> urnToRelationshipTypesBeingAdded =
         edgeAndRelationTypes.getSecond();
