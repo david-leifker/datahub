@@ -18,6 +18,7 @@ import com.linkedin.common.Status;
 import com.linkedin.common.UrnArray;
 import com.linkedin.common.urn.Urn;
 import com.linkedin.common.urn.UrnUtils;
+import com.linkedin.data.template.RecordTemplate;
 import com.linkedin.data.template.StringArray;
 import com.linkedin.entity.Aspect;
 import com.linkedin.identity.CorpUserStatus;
@@ -141,6 +142,18 @@ public class ActorContextTest {
         ActorContext.asSessionRestricted(userAuth, Set.of(POLICY_D), Set.of(), true)
             .getCacheKeyComponent(),
         "Expected differences with ownership type policy");
+  }
+
+  @Test
+  public void indexPoliciesByPrivilegeGroupsPoliciesByPrivilege() {
+    Map<String, List<RecordTemplate>> indexed =
+        ActorContext.indexPoliciesByPrivilege(Set.of(POLICY_ABC, POLICY_D));
+
+    assertEquals(indexed.get("a"), List.of(POLICY_ABC));
+    assertEquals(indexed.get("b"), List.of(POLICY_ABC));
+    assertEquals(indexed.get("c"), List.of(POLICY_ABC));
+    assertEquals(indexed.get("d"), List.of(POLICY_D));
+    assertEquals(ActorContext.indexPoliciesByPrivilege(Set.of()).size(), 0);
   }
 
   @Test
