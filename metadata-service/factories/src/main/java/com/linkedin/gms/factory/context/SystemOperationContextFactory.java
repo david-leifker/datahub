@@ -1,6 +1,8 @@
 package com.linkedin.gms.factory.context;
 
 import com.datahub.authentication.Authentication;
+import com.datahub.authentication.group.ActorGroupMembershipFetcher;
+import com.datahub.authentication.group.ActorGroupMembershipRolesResolver;
 import com.linkedin.entity.client.SystemEntityClient;
 import com.linkedin.gms.factory.config.ConfigurationProvider;
 import com.linkedin.gms.factory.search.BaseElasticSearchComponentsFactory;
@@ -15,6 +17,7 @@ import com.linkedin.metadata.search.SearchService;
 import com.linkedin.metadata.search.SearchServiceSearchRetriever;
 import com.linkedin.metadata.search.elasticsearch.index.MappingsBuilder;
 import com.linkedin.metadata.search.utils.ESUtils;
+import io.datahubproject.metadata.context.ActorGroupRolesResolver;
 import io.datahubproject.metadata.context.OperationContext;
 import io.datahubproject.metadata.context.OperationContextConfig;
 import io.datahubproject.metadata.context.PrimaryStorageContext;
@@ -82,12 +85,18 @@ public class SystemOperationContextFactory {
             .searchableFieldPaths(ESUtils.buildSearchableFieldPaths(entityRegistry))
             .build();
 
+    ActorGroupRolesResolver actorGroupRolesResolver =
+        new ActorGroupMembershipRolesResolver(new ActorGroupMembershipFetcher(systemEntityClient));
+
     OperationContext systemOperationContext =
         OperationContext.asSystem(
             operationContextConfig,
             systemAuthentication,
             entityServiceAspectRetriever.getEntityRegistry(),
-            ServicesRegistryContext.builder().restrictedService(restrictedService).build(),
+            ServicesRegistryContext.builder()
+                .restrictedService(restrictedService)
+                .actorGroupRolesResolver(actorGroupRolesResolver)
+                .build(),
             searchContext,
             RetrieverContext.builder()
                 .aspectRetriever(entityServiceAspectRetriever)
@@ -152,12 +161,18 @@ public class SystemOperationContextFactory {
             .searchableFieldPaths(ESUtils.buildSearchableFieldPaths(entityRegistry))
             .build();
 
+    ActorGroupRolesResolver actorGroupRolesResolver =
+        new ActorGroupMembershipRolesResolver(new ActorGroupMembershipFetcher(systemEntityClient));
+
     OperationContext systemOperationContext =
         OperationContext.asSystem(
             operationContextConfig,
             systemAuthentication,
             entityRegistry,
-            ServicesRegistryContext.builder().restrictedService(restrictedService).build(),
+            ServicesRegistryContext.builder()
+                .restrictedService(restrictedService)
+                .actorGroupRolesResolver(actorGroupRolesResolver)
+                .build(),
             searchContext,
             RetrieverContext.builder()
                 .cachingAspectRetriever(entityClientAspectRetriever)

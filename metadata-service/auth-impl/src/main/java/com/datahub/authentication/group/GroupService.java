@@ -44,18 +44,29 @@ public class GroupService {
   private final EntityClient _entityClient;
   private final EntityService<?> _entityService;
   private final GraphClient _graphClient;
+  private final ActorGroupMembershipFetcher _membershipFetcher;
 
   public GroupService(
       @Nonnull EntityClient entityClient,
       @Nonnull EntityService<?> entityService,
       @Nonnull GraphClient graphClient) {
+    this(entityClient, entityService, graphClient, new ActorGroupMembershipFetcher(entityClient));
+  }
+
+  GroupService(
+      @Nonnull EntityClient entityClient,
+      @Nonnull EntityService<?> entityService,
+      @Nonnull GraphClient graphClient,
+      @Nonnull ActorGroupMembershipFetcher membershipFetcher) {
     Objects.requireNonNull(entityClient, "entityClient must not be null!");
     Objects.requireNonNull(entityService, "entityService must not be null!");
     Objects.requireNonNull(graphClient, "secretService must not be null!");
+    Objects.requireNonNull(membershipFetcher, "membershipFetcher must not be null!");
 
     _entityClient = entityClient;
     _entityService = entityService;
     _graphClient = graphClient;
+    _membershipFetcher = membershipFetcher;
   }
 
   public boolean groupExists(@Nonnull OperationContext opContext, @Nonnull Urn groupUrn) {
@@ -180,13 +191,10 @@ public class GroupService {
 
   public List<Urn> getGroupsForUser(@Nonnull OperationContext opContext, @Nonnull final Urn userUrn)
       throws Exception {
-    final NativeGroupMembership nativeGroupMembership =
-        getExistingNativeGroupMembership(opContext, userUrn);
-    final GroupMembership groupMembership = getExistingGroupMembership(opContext, userUrn);
-    final List<Urn> allGroups = new ArrayList<>();
-    allGroups.addAll(nativeGroupMembership.getNativeGroups());
-    allGroups.addAll(groupMembership.getGroups());
-    return allGroups;
+    if (userUrn.equals(opContext.getSessionActorContext().getActorUrn())) {
+      return new ArrayList<>(opContext.getSessionActorContext().getGroupMembership());
+    }
+    return new ArrayList<>(_membershipFetcher.fetch(opContext, userUrn).getGroups());
   }
 
   NativeGroupMembership getExistingNativeGroupMembership(

@@ -1137,6 +1137,162 @@ public class DataHubAuthorizerTest {
     assertEquals(_dataHubAuthorizer.authorize(request).getType(), AuthorizationResult.Type.ALLOW);
   }
 
+  @Test
+  public void testAuthorizationGrantedBasedOnSeededGroupMembershipSkipsUserFetch()
+      throws Exception {
+    final EntitySpec resourceSpec = new EntitySpec("dataset", "urn:li:dataset:custom");
+
+    final Urn userUrnWithoutPermissions = UrnUtils.getUrn("urn:li:corpuser:userWithoutRole");
+    final Urn groupWithAdminPermission = UrnUtils.getUrn("urn:li:corpGroup:groupWithRole");
+    final UrnArray groups = new UrnArray(List.of(groupWithAdminPermission));
+    final GroupMembership groupMembership = new GroupMembership();
+    groupMembership.setGroups(groups);
+
+    when(_entityClient.batchGetV2(
+            any(OperationContext.class),
+            any(),
+            eq(Collections.singleton(userUrnWithoutPermissions)),
+            eq(
+                ImmutableSet.of(
+                    ROLE_MEMBERSHIP_ASPECT_NAME,
+                    GROUP_MEMBERSHIP_ASPECT_NAME,
+                    NATIVE_GROUP_MEMBERSHIP_ASPECT_NAME))))
+        .thenReturn(
+            createEntityBatchResponse(
+                userUrnWithoutPermissions, GROUP_MEMBERSHIP_ASPECT_NAME, groupMembership));
+
+    when(_entityClient.batchGetV2(
+            any(OperationContext.class),
+            any(),
+            eq(Collections.singleton(groupWithAdminPermission)),
+            eq(Collections.singleton(ROLE_MEMBERSHIP_ASPECT_NAME))))
+        .thenReturn(
+            createRoleMembershipBatchResponse(
+                groupWithAdminPermission, UrnUtils.getUrn("urn:li:dataHubRole:Admin")));
+
+    clearInvocations(_entityClient);
+
+    AuthorizationRequest request =
+        new AuthorizationRequest(
+            userUrnWithoutPermissions.toString(),
+            "EDIT_USER_PROFILE",
+            Optional.of(resourceSpec),
+            Collections.emptyList(),
+            null,
+            List.of(groupWithAdminPermission),
+            Collections.emptySet());
+
+    assertEquals(_dataHubAuthorizer.authorize(request).getType(), AuthorizationResult.Type.ALLOW);
+
+    verify(_entityClient, never())
+        .batchGetV2(
+            any(OperationContext.class),
+            any(),
+            eq(Collections.singleton(userUrnWithoutPermissions)),
+            any());
+    verify(_entityClient, times(1))
+        .batchGetV2(
+            any(OperationContext.class),
+            any(),
+            eq(Collections.singleton(groupWithAdminPermission)),
+            eq(Collections.singleton(ROLE_MEMBERSHIP_ASPECT_NAME)));
+  }
+
+  @Test
+  public void testMultipleAuthorizeCallsReuseSessionActorRoleResolution() throws Exception {
+    final EntitySpec resourceSpec = new EntitySpec("dataset", "urn:li:dataset:custom");
+    final EntitySpec otherResourceSpec = new EntitySpec("dataset", "urn:li:dataset:other");
+
+    final Urn userUrnWithoutPermissions = UrnUtils.getUrn("urn:li:corpuser:userWithoutRole");
+    final Urn groupWithAdminPermission = UrnUtils.getUrn("urn:li:corpGroup:groupWithRole");
+    final SessionActorIdentity sessionIdentity =
+        new SessionActorIdentity(
+            userUrnWithoutPermissions, List.of(groupWithAdminPermission), Set.of());
+
+    when(_entityClient.batchGetV2(
+            any(OperationContext.class),
+            any(),
+            eq(Collections.singleton(groupWithAdminPermission)),
+            eq(Collections.singleton(ROLE_MEMBERSHIP_ASPECT_NAME))))
+        .thenReturn(
+            createRoleMembershipBatchResponse(
+                groupWithAdminPermission, UrnUtils.getUrn("urn:li:dataHubRole:Admin")));
+
+    clearInvocations(_entityClient);
+
+    AuthorizationRequest requestOne =
+        new AuthorizationRequest(
+            userUrnWithoutPermissions.toString(),
+            "EDIT_USER_PROFILE",
+            Optional.of(resourceSpec),
+            Collections.emptyList(),
+            null,
+            List.of(groupWithAdminPermission),
+            Collections.emptySet(),
+            sessionIdentity);
+    AuthorizationRequest requestTwo =
+        new AuthorizationRequest(
+            userUrnWithoutPermissions.toString(),
+            "EDIT_USER_PROFILE",
+            Optional.of(otherResourceSpec),
+            Collections.emptyList(),
+            null,
+            List.of(groupWithAdminPermission),
+            Collections.emptySet(),
+            sessionIdentity);
+
+    assertEquals(
+        _dataHubAuthorizer.authorize(requestOne, null, systemOpContext).getType(),
+        AuthorizationResult.Type.ALLOW);
+    assertEquals(
+        _dataHubAuthorizer.authorize(requestTwo, null, systemOpContext).getType(),
+        AuthorizationResult.Type.ALLOW);
+
+    verify(_entityClient, times(1))
+        .batchGetV2(
+            any(OperationContext.class),
+            any(),
+            eq(Collections.singleton(groupWithAdminPermission)),
+            eq(Collections.singleton(ROLE_MEMBERSHIP_ASPECT_NAME)));
+  }
+
+  @Test
+  public void testGetActorPoliciesWithSeededGroupsSkipsUserFetch() throws Exception {
+    final Urn userUrnWithoutPermissions = UrnUtils.getUrn("urn:li:corpuser:userWithoutRole");
+    final Urn groupWithAdminPermission = UrnUtils.getUrn("urn:li:corpGroup:groupWithRole");
+
+    when(_entityClient.batchGetV2(
+            any(OperationContext.class),
+            any(),
+            eq(Collections.singleton(groupWithAdminPermission)),
+            eq(Collections.singleton(ROLE_MEMBERSHIP_ASPECT_NAME))))
+        .thenReturn(
+            createRoleMembershipBatchResponse(
+                groupWithAdminPermission, UrnUtils.getUrn("urn:li:dataHubRole:Admin")));
+
+    clearInvocations(_entityClient);
+
+    Set<DataHubPolicyInfo> policies =
+        _dataHubAuthorizer.getActorPolicies(
+            userUrnWithoutPermissions, List.of(groupWithAdminPermission), Collections.emptySet());
+
+    assertTrue(
+        policies.stream().anyMatch(policy -> policy.getPrivileges().contains("EDIT_USER_PROFILE")));
+
+    verify(_entityClient, never())
+        .batchGetV2(
+            any(OperationContext.class),
+            any(),
+            eq(Collections.singleton(userUrnWithoutPermissions)),
+            any());
+    verify(_entityClient, times(1))
+        .batchGetV2(
+            any(OperationContext.class),
+            any(),
+            eq(Collections.singleton(groupWithAdminPermission)),
+            eq(Collections.singleton(ROLE_MEMBERSHIP_ASPECT_NAME)));
+  }
+
   private DataHubPolicyInfo createDataHubPolicyInfo(
       boolean active, List<String> privileges, @Nullable final Urn domain) throws Exception {
 

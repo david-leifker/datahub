@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -337,5 +338,42 @@ public class GroupServiceTest {
     _groupService.removeExistingGroupMembers(
         opContext, Urn.createFromString(EXTERNAL_GROUP_URN_STRING), USER_URN_LIST);
     verify(_entityClient).ingestProposal(any(OperationContext.class), any());
+  }
+
+  @Test
+  public void testGetGroupsForUserUsesSessionCacheForSessionActor() throws Exception {
+    Urn externalGroup = Urn.createFromString(EXTERNAL_GROUP_URN_STRING);
+    Urn nativeGroup = Urn.createFromString(NATIVE_GROUP_URN_STRING);
+    OperationContext sessionOpContext = mock(OperationContext.class);
+    io.datahubproject.metadata.context.ActorContext actorContext =
+        mock(io.datahubproject.metadata.context.ActorContext.class);
+    when(sessionOpContext.getSessionActorContext()).thenReturn(actorContext);
+    when(actorContext.getActorUrn()).thenReturn(USER_URN);
+    when(actorContext.getGroupMembership())
+        .thenReturn(ImmutableList.of(externalGroup, nativeGroup));
+
+    List<Urn> groups = _groupService.getGroupsForUser(sessionOpContext, USER_URN);
+
+    assertEquals(groups, ImmutableList.of(externalGroup, nativeGroup));
+    verifyNoInteractions(_entityClient);
+  }
+
+  @Test
+  public void testGetGroupsForUserFetchesForNonSessionActor() throws Exception {
+    Urn otherUser = new CorpuserUrn("other@email.com");
+    when(_entityClient.batchGetV2(
+            any(OperationContext.class), eq(CORP_USER_ENTITY_NAME), eq(Set.of(otherUser)), any()))
+        .thenReturn(ImmutableMap.of(otherUser, _entityResponseMap.get(USER_URN)));
+
+    List<Urn> groups = _groupService.getGroupsForUser(opContext, otherUser);
+
+    assertEquals(
+        groups,
+        ImmutableList.of(
+            Urn.createFromString(EXTERNAL_GROUP_URN_STRING),
+            Urn.createFromString(NATIVE_GROUP_URN_STRING)));
+    verify(_entityClient)
+        .batchGetV2(
+            any(OperationContext.class), eq(CORP_USER_ENTITY_NAME), eq(Set.of(otherUser)), any());
   }
 }

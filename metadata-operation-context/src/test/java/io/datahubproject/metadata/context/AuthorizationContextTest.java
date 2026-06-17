@@ -21,6 +21,7 @@ import com.linkedin.data.template.StringArray;
 import com.linkedin.metadata.authorization.PoliciesConfig;
 import com.linkedin.policy.DataHubActorFilter;
 import com.linkedin.policy.DataHubPolicyInfo;
+import io.datahubproject.test.metadata.context.TestOperationContexts;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -55,8 +56,9 @@ public class AuthorizationContextTest {
     AuthorizationContext authorizationContext =
         AuthorizationContext.builder().authorizer(authorizer).build();
     EntitySpec resource = new EntitySpec("dataset", "urn:li:dataset:test");
+    OperationContext opContext = TestOperationContexts.systemContextNoValidate();
 
-    authorizationContext.authorize(actorContext, "VIEW", resource);
+    authorizationContext.authorize(opContext, actorContext, "VIEW", resource);
 
     AuthorizationRequest request = captor.getValue();
     assertEquals(request.getActorPoliciesByPrivilege(), actorPoliciesByPrivilege);
@@ -82,8 +84,9 @@ public class AuthorizationContextTest {
         AuthorizationContext.builder().authorizer(authorizer).build();
     EntitySpec resource = new EntitySpec("dataset", "urn:li:dataset:test");
     EntitySpec subResource = new EntitySpec("tag", "urn:li:tag:test");
+    OperationContext opContext = TestOperationContexts.systemContextNoValidate();
 
-    authorizationContext.authorize(actorContext, "EDIT", resource, List.of(subResource));
+    authorizationContext.authorize(opContext, actorContext, "EDIT", resource, List.of(subResource));
 
     AuthorizationRequest request = captor.getValue();
     assertEquals(request.getActorPoliciesByPrivilege(), actorPoliciesByPrivilege);

@@ -47,6 +47,7 @@ public class ActorContext implements ContextInterface {
       Authentication authentication,
       Set<DataHubPolicyInfo> dataHubPolicySet,
       Collection<Urn> groupMembership,
+      Set<Urn> directRoleMembership,
       boolean enforceExistenceEnabled) {
     return ActorContext.builder()
         .systemAuth(false)
@@ -54,8 +55,24 @@ public class ActorContext implements ContextInterface {
         .policyInfoSet(dataHubPolicySet)
         .actorPoliciesByPrivilege(indexPoliciesByPrivilege(dataHubPolicySet))
         .groupMembership(groupMembership)
+        .directRoleMembership(directRoleMembership)
         .enforceExistenceEnabled(enforceExistenceEnabled)
         .build();
+  }
+
+  /**
+   * True when the session authentication is the same actor as the optional system actor context.
+   * Used when constructing a session {@link ActorContext}; distinct from {@link
+   * OperationContext#isSystemAuth()} which also requires allow-system-authentication config.
+   */
+  public static boolean isSystemSession(
+      @Nonnull final Authentication sessionAuthentication,
+      @Nullable final ActorContext systemActorContext) {
+    return systemActorContext != null
+        && systemActorContext
+            .getAuthentication()
+            .getActor()
+            .equals(sessionAuthentication.getActor());
   }
 
   private final Authentication authentication;
@@ -73,6 +90,9 @@ public class ActorContext implements ContextInterface {
 
   @EqualsAndHashCode.Exclude @Builder.Default
   private final Collection<Urn> groupMembership = Collections.emptyList();
+
+  @EqualsAndHashCode.Exclude @Builder.Default
+  private final Set<Urn> directRoleMembership = Collections.emptySet();
 
   @EqualsAndHashCode.Exclude private final boolean systemAuth;
 

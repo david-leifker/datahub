@@ -1,6 +1,7 @@
 package com.datahub.authorization;
 
 import com.datahub.authentication.Authentication;
+import com.datahub.authentication.group.ActorGroupMembershipFetcher;
 import com.datahub.plugins.auth.authorization.Authorizer;
 import com.datahub.plugins.auth.authorization.ResourceSpecCachingAuthorizer;
 import com.google.common.annotations.VisibleForTesting;
@@ -11,6 +12,7 @@ import com.linkedin.entity.client.EntityClient;
 import com.linkedin.metadata.authorization.PoliciesConfig;
 import com.linkedin.policy.DataHubPolicyInfo;
 import io.datahubproject.metadata.context.OperationContext;
+import io.datahubproject.metadata.context.OperationContextAuthorizer;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -44,7 +46,8 @@ import lombok.extern.slf4j.Slf4j;
  */
 // TODO: Decouple this from all Rest.li objects if possible.
 @Slf4j
-public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthorizer {
+public class DataHubAuthorizer
+    implements Authorizer, ResourceSpecCachingAuthorizer, OperationContextAuthorizer {
 
   public enum AuthorizationMode {
     /** Default mode simply means that authorization is enforced, with a DENY result returned */
@@ -67,6 +70,7 @@ public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthori
       Executors.newScheduledThreadPool(1);
   private final PolicyRefreshRunnable policyRefreshRunnable;
   private final PolicyEngine policyEngine;
+  private final ActorGroupMembershipFetcher actorGroupMembershipFetcher;
   private EntitySpecResolver entitySpecResolver;
   private AuthorizationMode mode;
   @Getter private final OperationContext systemOpContext;
@@ -82,7 +86,9 @@ public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthori
       final int policyFetchSize) {
     this.systemOpContext = systemOpContext;
     this.mode = Objects.requireNonNull(mode);
-    policyEngine = new PolicyEngine(Objects.requireNonNull(entityClient));
+    actorGroupMembershipFetcher =
+        new ActorGroupMembershipFetcher(Objects.requireNonNull(entityClient));
+    policyEngine = new PolicyEngine(entityClient, actorGroupMembershipFetcher);
     if (refreshIntervalSeconds > 0) {
       policyRefreshRunnable =
           new PolicyRefreshRunnable(
@@ -112,6 +118,14 @@ public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthori
   public AuthorizationResult authorize(
       @Nonnull final AuthorizationRequest request,
       @Nullable final Map<EntitySpec, ResolvedEntitySpec> resourceSpecCache) {
+    return authorize(request, resourceSpecCache, systemOpContext);
+  }
+
+  @Override
+  public AuthorizationResult authorize(
+      @Nonnull final AuthorizationRequest request,
+      @Nullable final Map<EntitySpec, ResolvedEntitySpec> resourceSpecCache,
+      @Nonnull final OperationContext opContext) {
 
     // 0. Short circuit: If the action is being performed by the system (root), always allow it.
     if (isSystemRequest(request, systemOpContext.getAuthentication())) {
@@ -145,9 +159,32 @@ public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthori
       }
     }
 
+    Optional<Urn> actorUrn = getUrnFromRequestActor(request.getActorUrn());
+    if (actorUrn.isEmpty()) {
+      return new AuthorizationResult(request, AuthorizationResult.Type.DENY, null);
+    }
+
+    final ResolvedEntitySpec resolvedActorSpec =
+        entitySpecResolver.resolve(
+            new EntitySpec(actorUrn.get().getEntityType(), request.getActorUrn()));
+
+    final PolicyEngine.PolicyEvaluationContext sharedEvaluationContext =
+        policyEngine.createSeededEvaluationContext(
+            request.getSessionActorIdentity(),
+            request.getActorGroupMembership(),
+            request.getActorDirectRoles(),
+            opContext);
+
     // 2. Evaluate each policy.
     for (DataHubPolicyInfo policy : policiesToEvaluate) {
-      if (isRequestGranted(policy, request, resolvedResourceSpec, resolvedSubResources)) {
+      if (isRequestGranted(
+          policy,
+          request,
+          resolvedActorSpec,
+          resolvedResourceSpec,
+          resolvedSubResources,
+          sharedEvaluationContext,
+          opContext)) {
         // Short circuit if policy has granted privileges to this actor.
         return new AuthorizationResult(
             request,
@@ -173,6 +210,13 @@ public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthori
 
   public PolicyEngine.PolicyGrantedPrivileges getGrantedPrivileges(
       final String actor, final Optional<EntitySpec> resourceSpec) {
+    return getGrantedPrivileges(actor, resourceSpec, systemOpContext);
+  }
+
+  public PolicyEngine.PolicyGrantedPrivileges getGrantedPrivileges(
+      final String actor,
+      final Optional<EntitySpec> resourceSpec,
+      @Nonnull final OperationContext opContext) {
 
     Urn actorUrn = UrnUtils.getUrn(actor);
 
@@ -188,7 +232,7 @@ public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthori
         resourceSpec.map(entitySpecResolver::resolve);
 
     return policyEngine.getGrantedPrivileges(
-        systemOpContext,
+        opContext,
         policiesToEvaluate,
         resolvedActorSpec,
         resolvedResourceSpec,
@@ -197,6 +241,38 @@ public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthori
 
   @Override
   public Set<DataHubPolicyInfo> getActorPolicies(@Nonnull Urn actorUrn) {
+    return getActorPolicies(actorUrn, null);
+  }
+
+  @Override
+  public Set<DataHubPolicyInfo> getActorPolicies(
+      @Nonnull Urn actorUrn, @Nullable Collection<Urn> preloadedGroups) {
+    return getActorPolicies(actorUrn, preloadedGroups, null);
+  }
+
+  @Override
+  public Set<DataHubPolicyInfo> getActorPolicies(
+      @Nonnull Urn actorUrn,
+      @Nullable Collection<Urn> preloadedGroups,
+      @Nullable Set<Urn> preloadedDirectRoles) {
+    return getActorPolicies(actorUrn, preloadedGroups, preloadedDirectRoles, systemOpContext);
+  }
+
+  public Set<DataHubPolicyInfo> getActorPolicies(
+      @Nonnull Urn actorUrn,
+      @Nullable Collection<Urn> preloadedGroups,
+      @Nullable Set<Urn> preloadedDirectRoles,
+      @Nonnull OperationContext opContext) {
+    return getActorPolicies(actorUrn, null, preloadedGroups, preloadedDirectRoles, opContext);
+  }
+
+  @Override
+  public Set<DataHubPolicyInfo> getActorPolicies(
+      @Nonnull Urn actorUrn,
+      @Nullable SessionActorIdentity sessionActorIdentity,
+      @Nullable Collection<Urn> preloadedGroups,
+      @Nullable Set<Urn> preloadedDirectRoles,
+      @Nonnull OperationContext opContext) {
     // 1. Fetch all policies
     final List<DataHubPolicyInfo> policiesToEvaluate =
         new LinkedList<>(getOrDefault(ALL, new ArrayList<>()));
@@ -206,29 +282,40 @@ public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthori
     final ResolvedEntitySpec resolvedActorSpec =
         entitySpecResolver.resolve(new EntitySpec(actorUrn.getEntityType(), actorUrn.toString()));
 
+    final PolicyEngine.PolicyEvaluationContext sharedContext =
+        preloadedGroups != null || preloadedDirectRoles != null || sessionActorIdentity != null
+            ? policyEngine.createSeededEvaluationContext(
+                sessionActorIdentity, preloadedGroups, preloadedDirectRoles, opContext)
+            : new PolicyEngine.PolicyEvaluationContext();
+
     return policiesToEvaluate.stream()
         .filter(policy -> PoliciesConfig.ACTIVE_POLICY_STATE.equals(policy.getState()))
         .filter(
             policy ->
                 (policy.getActors() != null && policy.getActors().isResourceOwners())
                     || policyEngine.isActorMatch(
-                        systemOpContext,
+                        opContext,
                         resolvedActorSpec,
                         policy.getActors(),
                         Optional.empty(),
-                        new PolicyEngine.PolicyEvaluationContext()))
+                        sharedContext))
         .collect(Collectors.toSet());
   }
 
   @Override
-  public Collection<Urn> getActorGroups(@Nonnull Urn actorUrn) {
-    // 1. Actor identity
-    final ResolvedEntitySpec resolvedActorSpec =
-        entitySpecResolver.resolve(new EntitySpec(actorUrn.getEntityType(), actorUrn.toString()));
+  public Optional<SessionActorIdentity> resolveSessionActorIdentity(@Nonnull Urn actorUrn) {
+    return resolveSessionActorIdentity(actorUrn, systemOpContext);
+  }
 
-    return resolvedActorSpec.getGroupMembership().stream()
-        .map(UrnUtils::getUrn)
-        .collect(Collectors.toList());
+  @Override
+  public Optional<SessionActorIdentity> resolveSessionActorIdentity(
+      @Nonnull Urn actorUrn, @Nonnull OperationContext opContext) {
+    return Optional.of(actorGroupMembershipFetcher.fetch(opContext, actorUrn));
+  }
+
+  @Override
+  public Collection<Urn> getActorGroups(@Nonnull Urn actorUrn) {
+    return actorGroupMembershipFetcher.fetch(systemOpContext, actorUrn).getGroups();
   }
 
   @Override
@@ -314,30 +401,25 @@ public class DataHubAuthorizer implements Authorizer, ResourceSpecCachingAuthori
   private boolean isRequestGranted(
       final DataHubPolicyInfo policy,
       final AuthorizationRequest request,
+      final ResolvedEntitySpec resolvedActorSpec,
       final Optional<ResolvedEntitySpec> resourceSpec,
-      final List<ResolvedEntitySpec> subResources) {
+      final List<ResolvedEntitySpec> subResources,
+      final PolicyEngine.PolicyEvaluationContext sharedEvaluationContext,
+      @Nonnull final OperationContext opContext) {
     if (AuthorizationMode.ALLOW_ALL.equals(mode())) {
       return true;
     }
 
-    Optional<Urn> actorUrn = getUrnFromRequestActor(request.getActorUrn());
-    if (actorUrn.isEmpty()) {
-      return false;
-    }
-
     try {
-      final ResolvedEntitySpec resolvedActorSpec =
-          entitySpecResolver.resolve(
-              new EntitySpec(actorUrn.get().getEntityType(), request.getActorUrn()));
-
       final PolicyEngine.PolicyEvaluationResult result =
           policyEngine.evaluatePolicy(
-              systemOpContext,
+              opContext,
               policy,
               resolvedActorSpec,
               request.getPrivilege(),
               resourceSpec,
-              subResources);
+              subResources,
+              sharedEvaluationContext);
       return result.isGranted();
     } catch (RuntimeException e) {
       log.error("Error evaluating policy {} for request {}", policy.getDisplayName(), request);
