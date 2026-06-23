@@ -938,7 +938,7 @@ networkx==3.6.1 ; python_full_version >= '3.11'
     # via acryl-datahub
 nh3==0.3.3
     # via readme-renderer
-nltk==3.9.3
+nltk==3.9.4
     # via unstructured
 notebook==7.5.4
     # via acryl-great-expectations
@@ -1230,8 +1230,9 @@ pyiceberg==0.11.1
     # via acryl-datahub
 pyiceberg-core==0.6.0
     # via pyiceberg
-pyjwt==2.11.0
+pyjwt==2.13.0
     # via
+    #   acryl-datahub
     #   feast
     #   msal
     #   simple-salesforce
@@ -1868,6 +1869,7 @@ typing-extensions==4.15.0
     #   pydantic
     #   pydantic-core
     #   pydash
+    #   pyjwt
     #   pyopenssl
     #   pypdf
     #   pytest-asyncio
