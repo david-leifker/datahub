@@ -141,6 +141,18 @@ public class StructuredPropertyUtils {
   }
 
   /**
+   * Whether aggregations and exact-match filters should target {@code <field>.keyword} for this
+   * value type. DATE / NUMBER / URN parents are already the typed exact-match field (date, double,
+   * or keyword without a normalizer), so the {@code .keyword} suffix must not be appended.
+   * STRING/RICH_TEXT parents use a normalizer; {@code .keyword} holds the un-normalized value.
+   */
+  public static boolean usesKeywordSubfield(@Nonnull LogicalValueType type) {
+    return type != LogicalValueType.DATE
+        && type != LogicalValueType.NUMBER
+        && type != LogicalValueType.URN;
+  }
+
+  /**
    * Given a structured property input field or facet name, return a valid structured property facet
    * name
    *
@@ -155,18 +167,13 @@ public class StructuredPropertyUtils {
     return lookupDefinitionFromFilterOrFacetName(opContext, fieldOrFacetName, aspectRetriever)
         .map(
             urnDefinition -> {
-              switch (getLogicalValueType(urnDefinition.getSecond())) {
-                case DATE:
-                case NUMBER:
-                  return STRUCTURED_PROPERTY_MAPPING_FIELD_PREFIX
+              String base =
+                  STRUCTURED_PROPERTY_MAPPING_FIELD_PREFIX
                       + StructuredPropertyUtils.toElasticsearchFieldName(
                           urnDefinition.getFirst(), urnDefinition.getSecond());
-                default:
-                  return STRUCTURED_PROPERTY_MAPPING_FIELD_PREFIX
-                      + StructuredPropertyUtils.toElasticsearchFieldName(
-                          urnDefinition.getFirst(), urnDefinition.getSecond())
-                      + ".keyword";
-              }
+              return usesKeywordSubfield(getLogicalValueType(urnDefinition.getSecond()))
+                  ? base + ".keyword"
+                  : base;
             });
   }
 

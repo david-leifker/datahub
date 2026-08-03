@@ -14,6 +14,7 @@ import static org.opensearch.core.rest.RestStatus.TOO_MANY_REQUESTS;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableList;
+import com.linkedin.common.urn.Urn;
 import com.linkedin.data.schema.DataSchema;
 import com.linkedin.data.schema.MapDataSchema;
 import com.linkedin.data.schema.PathSpec;
@@ -42,6 +43,8 @@ import com.linkedin.metadata.throttle.ThrottleResponseSource;
 import com.linkedin.metadata.utils.CriterionUtils;
 import com.linkedin.metadata.utils.elasticsearch.SearchClientShim;
 import com.linkedin.metadata.utils.elasticsearch.responses.RawResponse;
+import com.linkedin.structured.StructuredPropertyDefinition;
+import com.linkedin.util.Pair;
 import io.datahubproject.metadata.context.OperationContext;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -805,9 +808,12 @@ public class ESUtils {
       @Nonnull final String filterField,
       final boolean skipKeywordSuffix,
       @Nullable final AspectRetriever aspectRetriever) {
-    String fieldName =
+    Optional<Pair<Urn, StructuredPropertyDefinition>> structuredPropertyDefinition =
         StructuredPropertyUtils.lookupDefinitionFromFilterOrFacetName(
-                (com.datahub.context.OperationFingerprint) opContext, filterField, aspectRetriever)
+            (com.datahub.context.OperationFingerprint) opContext, filterField, aspectRetriever);
+
+    String fieldName =
+        structuredPropertyDefinition
             .map(
                 urnDefinition ->
                     STRUCTURED_PROPERTY_MAPPING_FIELD_PREFIX
@@ -815,7 +821,21 @@ public class ESUtils {
                             urnDefinition.getFirst(), urnDefinition.getSecond()))
             .orElse(filterField);
 
+    // DATE / NUMBER / URN parents are already the exact-match field — same rule as
+    // StructuredPropertyUtils.toStructuredPropertyFacetName. On a transient definition miss,
+    // prefer the parent field too: appending .keyword (the STRING-like fallback) returns empty
+    // for those typed parents. STRING/RICH_TEXT may briefly query the normalized parent instead
+    // of the raw .keyword subfield, which is preferable to hard-empty typed filters.
+    boolean skipStructuredPropertyKeywordSubfield =
+        structuredPropertyDefinition
+            .map(
+                urnDefinition ->
+                    !StructuredPropertyUtils.usesKeywordSubfield(
+                        StructuredPropertyUtils.getLogicalValueType(urnDefinition.getSecond())))
+            .orElseGet(() -> filterField.startsWith(STRUCTURED_PROPERTY_MAPPING_FIELD_PREFIX));
+
     return skipKeywordSuffix
+            || skipStructuredPropertyKeywordSubfield
             || KEYWORD_FIELDS.contains(fieldName)
             || KEYWORD_FIELDS.stream()
                 .anyMatch(nestedField -> fieldName.endsWith("." + nestedField))

@@ -281,4 +281,68 @@ public class StructuredPropertyUtilsTest {
                     "certification_status", urnB, Map.of("type", "double"))));
     assertTrue(resolved.isEmpty());
   }
+
+  @Test
+  public void testUsesKeywordSubfield() {
+    assertTrue(StructuredPropertyUtils.usesKeywordSubfield(LogicalValueType.STRING));
+    assertTrue(StructuredPropertyUtils.usesKeywordSubfield(LogicalValueType.RICH_TEXT));
+    assertTrue(StructuredPropertyUtils.usesKeywordSubfield(LogicalValueType.UNKNOWN));
+    assertFalse(StructuredPropertyUtils.usesKeywordSubfield(LogicalValueType.DATE));
+    assertFalse(StructuredPropertyUtils.usesKeywordSubfield(LogicalValueType.NUMBER));
+    assertFalse(StructuredPropertyUtils.usesKeywordSubfield(LogicalValueType.URN));
+  }
+
+  @Test
+  public void testToStructuredPropertyFacetNameSkipsKeywordForUrnDateNumber()
+      throws URISyntaxException {
+    Urn stringUrn = Urn.createFromString("urn:li:structuredProperty:status");
+    Urn urnUrn = Urn.createFromString("urn:li:structuredProperty:steward");
+    Urn dateUrn = Urn.createFromString("urn:li:structuredProperty:reviewedAt");
+    Urn numberUrn = Urn.createFromString("urn:li:structuredProperty:score");
+
+    MockAspectRetriever retriever =
+        new MockAspectRetriever(
+            Map.of(
+                stringUrn,
+                List.of(
+                    new StructuredPropertyDefinition()
+                        .setQualifiedName("status")
+                        .setValueType(Urn.createFromString("urn:li:dataType:datahub.string"))),
+                urnUrn,
+                List.of(
+                    new StructuredPropertyDefinition()
+                        .setQualifiedName("steward")
+                        .setValueType(Urn.createFromString("urn:li:dataType:datahub.urn"))),
+                dateUrn,
+                List.of(
+                    new StructuredPropertyDefinition()
+                        .setQualifiedName("reviewedAt")
+                        .setValueType(Urn.createFromString("urn:li:dataType:datahub.date"))),
+                numberUrn,
+                List.of(
+                    new StructuredPropertyDefinition()
+                        .setQualifiedName("score")
+                        .setValueType(Urn.createFromString("urn:li:dataType:datahub.number")))));
+
+    assertEquals(
+        StructuredPropertyUtils.toStructuredPropertyFacetName(
+                OperationFingerprint.EMPTY, "structuredProperties.status", retriever)
+            .orElseThrow(),
+        "structuredProperties.status.keyword");
+    assertEquals(
+        StructuredPropertyUtils.toStructuredPropertyFacetName(
+                OperationFingerprint.EMPTY, "structuredProperties.steward", retriever)
+            .orElseThrow(),
+        "structuredProperties.steward");
+    assertEquals(
+        StructuredPropertyUtils.toStructuredPropertyFacetName(
+                OperationFingerprint.EMPTY, "structuredProperties.reviewedAt", retriever)
+            .orElseThrow(),
+        "structuredProperties.reviewedAt");
+    assertEquals(
+        StructuredPropertyUtils.toStructuredPropertyFacetName(
+                OperationFingerprint.EMPTY, "structuredProperties.score", retriever)
+            .orElseThrow(),
+        "structuredProperties.score");
+  }
 }
