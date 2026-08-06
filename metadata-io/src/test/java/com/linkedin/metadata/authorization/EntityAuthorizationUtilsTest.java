@@ -332,7 +332,13 @@ public class EntityAuthorizationUtilsTest {
     when(aspectRetriever.entityExists(opContext, Set.of(DOCUMENT_URN)))
         .thenReturn(Map.of(DOCUMENT_URN, false));
     authUtilMock
-        .when(() -> AuthUtil.isAPIAuthorizedUrns(opContext, ENTITY, Set.of(createAuthorizationKey)))
+        .when(
+            () ->
+                AuthUtil.isAPIAuthorizedUrns(
+                    eq(opContext),
+                    eq(ENTITY),
+                    org.mockito.ArgumentMatchers.<java.util.Collection<Pair<ChangeType, Urn>>>any(),
+                    org.mockito.ArgumentMatchers.<Map<Urn, Boolean>>any()))
         .thenReturn(Map.of(createAuthorizationKey, 403));
 
     List<Pair<MetadataChangeProposal, Integer>> result =
@@ -385,7 +391,13 @@ public class EntityAuthorizationUtilsTest {
     when(aspectRetriever.entityExists(opContext, Set.of(DOCUMENT_URN)))
         .thenReturn(Map.of(DOCUMENT_URN, false));
     authUtilMock
-        .when(() -> AuthUtil.isAPIAuthorizedUrns(opContext, ENTITY, Set.of(createAuthorizationKey)))
+        .when(
+            () ->
+                AuthUtil.isAPIAuthorizedUrns(
+                    eq(opContext),
+                    eq(ENTITY),
+                    org.mockito.ArgumentMatchers.<java.util.Collection<Pair<ChangeType, Urn>>>any(),
+                    org.mockito.ArgumentMatchers.<Map<Urn, Boolean>>any()))
         .thenReturn(Map.of(createAuthorizationKey, 201));
 
     try (MockedStatic<EntityKeyUtils> entityKeyUtils = Mockito.mockStatic(EntityKeyUtils.class)) {
@@ -401,7 +413,7 @@ public class EntityAuthorizationUtilsTest {
   }
 
   @Test
-  public void testIngestAuthorization_nonDocumentSkipsExistenceLookup() {
+  public void testIngestAuthorization_nonDocumentUsesExistenceAwareAuth() {
     EntityRegistry entityRegistry = mock(EntityRegistry.class);
     MetadataChangeProposal proposal =
         new MetadataChangeProposal()
@@ -410,21 +422,23 @@ public class EntityAuthorizationUtilsTest {
             .setChangeType(ChangeType.UPSERT);
     Pair<ChangeType, Urn> authorizationKey = Pair.of(ChangeType.UPSERT, DATASET_URN);
     authUtilMock.when(AuthUtil::isRestApiAuthorizationEnabled).thenReturn(true);
-    documentAuthMock
+    when(aspectRetriever.entityExists(opContext, Set.of(DATASET_URN)))
+        .thenReturn(Map.of(DATASET_URN, false));
+    authUtilMock
         .when(
             () ->
-                DocumentAuthorizationUtils.effectiveDocumentIngestAuthorizationKey(
-                    ChangeType.UPSERT, DATASET_URN, false))
-        .thenReturn(authorizationKey);
-    authUtilMock
-        .when(() -> AuthUtil.isAPIAuthorizedUrns(opContext, ENTITY, Set.of(authorizationKey)))
+                AuthUtil.isAPIAuthorizedUrns(
+                    eq(opContext),
+                    eq(ENTITY),
+                    eq(Set.of(authorizationKey)),
+                    eq(Map.of(DATASET_URN, false))))
         .thenReturn(Map.of(authorizationKey, 200));
 
     assertEquals(
         EntityAuthorizationUtils.isAPIAuthorizedIngest(
             opContext, entityRegistry, List.of(proposal)),
         List.of(Pair.of(proposal, 200)));
-    Mockito.verify(aspectRetriever, Mockito.never()).entityExists(any(), any());
+    Mockito.verify(aspectRetriever).entityExists(opContext, Set.of(DATASET_URN));
   }
 
   @Test
@@ -507,5 +521,31 @@ public class EntityAuthorizationUtilsTest {
 
       assertTrue(EntityAuthorizationUtils.canViewEntity(opContext, SCHEMA_FIELD_URN));
     }
+  }
+
+  @Test
+  public void testBatchItemsAuthorization_existenceAware() {
+    com.linkedin.metadata.aspect.batch.BatchItem item =
+        mock(com.linkedin.metadata.aspect.batch.BatchItem.class);
+    when(item.getUrn()).thenReturn(DATASET_URN);
+    when(item.getChangeType()).thenReturn(ChangeType.CREATE_ENTITY);
+    when(item.getAspectName()).thenReturn("domains");
+    Pair<ChangeType, Urn> authorizationKey = Pair.of(ChangeType.CREATE_ENTITY, DATASET_URN);
+    authUtilMock.when(AuthUtil::isRestApiAuthorizationEnabled).thenReturn(true);
+    when(aspectRetriever.entityExists(opContext, Set.of(DATASET_URN)))
+        .thenReturn(Map.of(DATASET_URN, true));
+    authUtilMock
+        .when(
+            () ->
+                AuthUtil.isAPIAuthorizedUrns(
+                    eq(opContext),
+                    eq(ENTITY),
+                    eq(Set.of(authorizationKey)),
+                    eq(Map.of(DATASET_URN, true))))
+        .thenReturn(Map.of(authorizationKey, 403));
+
+    assertEquals(
+        EntityAuthorizationUtils.isAPIAuthorizedBatchItems(opContext, List.of(item)),
+        List.of(Pair.of(item, 403)));
   }
 }

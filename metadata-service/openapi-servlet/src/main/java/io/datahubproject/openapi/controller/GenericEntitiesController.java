@@ -1,7 +1,6 @@
 package io.datahubproject.openapi.controller;
 
 import static com.linkedin.metadata.Constants.TIMESTAMP_MILLIS;
-import static com.linkedin.metadata.authorization.ApiOperation.CREATE;
 import static com.linkedin.metadata.authorization.ApiOperation.DELETE;
 import static com.linkedin.metadata.authorization.ApiOperation.EXISTS;
 import static com.linkedin.metadata.authorization.ApiOperation.READ;
@@ -568,21 +567,24 @@ public abstract class GenericEntitiesController<
             authentication,
             true);
 
-    if (!EntityAuthorizationUtils.isAPIAuthorizedWriteEntityTypes(
-        opContext, CREATE, List.of(entityName))) {
-      throw new UnauthorizedException(
-          authentication.getActor().toUrnStr() + " is unauthorized to " + CREATE + " entities.");
-    }
-
+    // Per-URN auth after toMCPBatch (existence-aware + proposed domains). Do not gate on
+    // type-level CREATE: EntitySpec(type, "") has no DOMAIN field, so domain-scoped create
+    // policies cannot match a type-only check.
     AspectsBatch batch = toMCPBatch(opContext, jsonEntityList, authentication.getActor());
-    // Existence-aware document CREATE/UPDATE: CREATE_ENTITY alone must not overwrite existing
-    // documents, and UPDATE alone must not create missing ones.
-    if (!EntityAuthorizationUtils.isAPIAuthorizedEntityUrns(
-        opContext,
-        CREATE,
-        batch.getItems().stream().map(item -> item.getUrn()).collect(Collectors.toSet()))) {
+    List<com.linkedin.util.Pair<com.linkedin.metadata.aspect.batch.BatchItem, Integer>> denied =
+        EntityAuthorizationUtils.isAPIAuthorizedBatchItems(opContext, batch.getItems()).stream()
+            .filter(p -> p.getSecond() != org.apache.http.HttpStatus.SC_OK)
+            .collect(Collectors.toList());
+    if (!denied.isEmpty()) {
       throw new UnauthorizedException(
-          authentication.getActor().toUrnStr() + " is unauthorized to " + CREATE + " entities.");
+          authentication.getActor().toUrnStr()
+              + " is unauthorized to write entities. "
+              + denied.stream()
+                  .map(
+                      d ->
+                          String.format(
+                              "HttpStatus: %s Urn: %s", d.getSecond(), d.getFirst().getUrn()))
+                  .collect(Collectors.toList()));
     }
     List<IngestResult> results = entityService.ingestProposal(opContext, batch, async);
 
@@ -685,11 +687,6 @@ public abstract class GenericEntitiesController<
             authentication,
             true);
 
-    if (!EntityAuthorizationUtils.isAPIAuthorizedEntityUrns(opContext, CREATE, List.of(urn))) {
-      throw new UnauthorizedException(
-          authentication.getActor().toUrnStr() + " is unauthorized to " + CREATE + " entities.");
-    }
-
     AspectSpec aspectSpec = RequestInputUtil.lookupAspectSpec(entitySpec, aspectName).get();
     ChangeMCP upsert =
         toUpsertItem(
@@ -700,6 +697,19 @@ public abstract class GenericEntitiesController<
             createIfNotExists,
             jsonAspect,
             authentication.getActor());
+
+    List<com.linkedin.util.Pair<com.linkedin.metadata.aspect.batch.BatchItem, Integer>> denied =
+        EntityAuthorizationUtils.isAPIAuthorizedBatchItems(opContext, List.of(upsert)).stream()
+            .filter(p -> p.getSecond() != org.apache.http.HttpStatus.SC_OK)
+            .collect(Collectors.toList());
+    if (!denied.isEmpty()) {
+      throw new UnauthorizedException(
+          authentication.getActor().toUrnStr()
+              + " is unauthorized to write aspect "
+              + aspectName
+              + " on "
+              + urn);
+    }
 
     List<IngestResult> results =
         entityService.ingestProposal(
