@@ -465,8 +465,10 @@ def _attempt_create(
             status = exc.info.get("status")
             if isinstance(status, str) and status.isdigit():
                 status = int(status)
-            return False, status if isinstance(status, int) else None, (
-                f"restli status={status} body={exc.message}"
+            return (
+                False,
+                status if isinstance(status, int) else None,
+                (f"restli status={status} body={exc.message}"),
             )
         except Exception as exc:  # noqa: BLE001
             return False, None, f"restli error={exc}"
@@ -540,7 +542,9 @@ def _wait_until_policy_allows_domain_a(setup: dict, api: str, mode: str) -> None
     wait_for_writes_to_sync()
 
 
-@pytest.mark.parametrize("api,mode", TRANSPORTS, ids=[_transport_id(a, m) for a, m in TRANSPORTS])
+@pytest.mark.parametrize(
+    "api,mode", TRANSPORTS, ids=[_transport_id(a, m) for a, m in TRANSPORTS]
+)
 class TestDomainScopedCreateEntityAuth:
     """Domain-separated writer matrix on OpenAPI sync/async and Rest.li sync."""
 
@@ -601,9 +605,7 @@ class TestDomainScopedCreateEntityAuth:
             _wait_until_policy_allows_domain_a(setup, api, mode)
 
             def _attempt() -> tuple[bool, Optional[int], str]:
-                return _attempt_create(
-                    api, mode, setup, urn, domain_urn=DOMAIN_B_URN
-                )
+                return _attempt_create(api, mode, setup, urn, domain_urn=DOMAIN_B_URN)
 
             status, detail = _wait_until(
                 _attempt,
